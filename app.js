@@ -31,7 +31,6 @@ class MorseApp {
             transmissionStatus: document.getElementById('transmissionStatus'),
             cameraVideo: document.getElementById('cameraVideo'),
             detectionCanvas: document.getElementById('detectionCanvas'),
-            startReceiveBtn: document.getElementById('startReceiveBtn'),
             stopReceiveBtn: document.getElementById('stopReceiveBtn'),
             receiveStatus: document.getElementById('receiveStatus'),
             receivedMorse: document.getElementById('receivedMorse'),
@@ -58,7 +57,6 @@ class MorseApp {
         this.elements.messageInput.addEventListener('input', () => this.updateMorsePreview());
         this.elements.transmitButton.addEventListener('click', () => this.startTransmission());
         
-        this.elements.startReceiveBtn.addEventListener('click', () => this.startReceiving());
         this.elements.stopReceiveBtn.addEventListener('click', () => this.stopReceiving());
         
         this.updateCharCount();
@@ -381,7 +379,7 @@ class MorseApp {
         let message = 'Camera initialization failed. ';
         
         if (error.name === 'NotAllowedError') {
-            message += 'Please allow camera access and try again.';
+            message += 'Please allow camera access and switch to receive mode again.';
         } else if (error.name === 'NotFoundError') {
             message += 'No camera found on this device.';
         } else if (error.name === 'NotSupportedError') {
@@ -389,13 +387,12 @@ class MorseApp {
         } else if (error.name === 'NotReadableError') {
             message += 'Camera is in use by another application.';
         } else {
-            message += 'Click "Start Receiving" to try again.';
+            message += 'Switch to transmit mode and back to receive to try again.';
         }
         
         this.showReceiveStatus(message, 'error');
         
-        // Show manual start button as fallback
-        this.elements.startReceiveBtn.classList.remove('hidden');
+        // Hide stop button since receiving failed
         this.elements.stopReceiveBtn.classList.add('hidden');
     }
 
@@ -445,7 +442,6 @@ class MorseApp {
             
             this.isReceiving = true;
             
-            this.elements.startReceiveBtn.classList.add('hidden');
             this.elements.stopReceiveBtn.classList.remove('hidden');
             
             // Show which camera is being used
@@ -585,7 +581,6 @@ class MorseApp {
             this.animationFrame = null;
         }
         
-        this.elements.startReceiveBtn.classList.remove('hidden');
         this.elements.stopReceiveBtn.classList.add('hidden');
         this.elements.receiveStatus.classList.add('hidden');
         
