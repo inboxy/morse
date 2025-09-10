@@ -14,6 +14,8 @@ class MorseApp {
         this.initializeElements();
         this.setupEventListeners();
         this.registerServiceWorker();
+        
+        console.log('MorseApp initialized');
     }
     
     initializeElements() {
@@ -38,8 +40,20 @@ class MorseApp {
     }
     
     setupEventListeners() {
-        this.elements.transmitBtn.addEventListener('click', async () => await this.switchMode('transmit'));
-        this.elements.receiveBtn.addEventListener('click', async () => await this.switchMode('receive'));
+        this.elements.transmitBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.switchMode('transmit').catch(error => {
+                console.error('Error switching to transmit mode:', error);
+            });
+        });
+        
+        this.elements.receiveBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Receive button clicked, switching to receive mode...');
+            this.switchMode('receive').catch(error => {
+                console.error('Error switching to receive mode:', error);
+            });
+        });
         
         this.elements.messageInput.addEventListener('input', () => this.updateMorsePreview());
         this.elements.transmitButton.addEventListener('click', () => this.startTransmission());
@@ -63,6 +77,7 @@ class MorseApp {
     }
     
     async switchMode(mode) {
+        console.log(`Switching to ${mode} mode...`);
         this.currentMode = mode;
         
         this.elements.transmitBtn.classList.toggle('active', mode === 'transmit');
@@ -76,10 +91,13 @@ class MorseApp {
         
         if (mode === 'receive') {
             this.stopTransmission();
+            console.log('About to auto-start receiving...');
             await this.autoStartReceiving();
         } else {
             this.stopReceiving();
         }
+        
+        console.log(`Mode switch to ${mode} complete`);
     }
     
     updateCharCount() {
@@ -336,11 +354,25 @@ class MorseApp {
     }
     
     async autoStartReceiving() {
+        console.log('=== AUTO-START RECEIVING ===');
+        console.log('Current mode:', this.currentMode);
+        console.log('Is receiving:', this.isReceiving);
+        
         try {
+            console.log('Setting loading status...');
             this.showReceiveStatus('Initializing camera...', 'loading');
+            
+            console.log('Calling startReceiving...');
             await this.startReceiving();
+            
+            console.log('Auto-start receiving completed successfully');
         } catch (error) {
             console.error('Auto-start receiving failed:', error);
+            console.error('Error details:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
             this.handleCameraError(error);
         }
     }
@@ -368,13 +400,23 @@ class MorseApp {
     }
 
     async startReceiving() {
-        if (this.isReceiving) return;
+        console.log('=== START RECEIVING ===');
+        console.log('Current isReceiving state:', this.isReceiving);
+        
+        if (this.isReceiving) {
+            console.log('Already receiving, returning early');
+            return;
+        }
         
         try {
+            console.log('Setting requesting camera status...');
             this.showReceiveStatus('Requesting camera access...', 'loading');
+            
+            console.log('Attempting to get user media...');
             
             // Try back camera first, fallback to front camera
             try {
+                console.log('Trying back camera...');
                 this.stream = await navigator.mediaDevices.getUserMedia({
                     video: { 
                         facingMode: { exact: 'environment' },
@@ -385,6 +427,7 @@ class MorseApp {
                 console.log('Using back camera for light detection');
             } catch (backCameraError) {
                 console.warn('Back camera not available, falling back to front camera:', backCameraError);
+                console.log('Trying front camera...');
                 this.stream = await navigator.mediaDevices.getUserMedia({
                     video: { 
                         facingMode: 'user',
@@ -460,9 +503,26 @@ class MorseApp {
     }
     
     showReceiveStatus(message, type = 'active') {
+        console.log(`Setting receive status: ${message} (${type})`);
+        
         const statusElement = this.elements.receiveStatus;
+        if (!statusElement) {
+            console.error('receiveStatus element not found');
+            return;
+        }
+        
         const statusText = statusElement.querySelector('span');
         const statusIndicator = statusElement.querySelector('.status-indicator');
+        
+        if (!statusText) {
+            console.error('Status text span not found');
+            return;
+        }
+        
+        if (!statusIndicator) {
+            console.error('Status indicator not found');
+            return;
+        }
         
         statusText.textContent = message;
         statusElement.classList.remove('hidden');
@@ -476,6 +536,8 @@ class MorseApp {
         } else {
             statusIndicator.classList.add('active');
         }
+        
+        console.log('Receive status updated successfully');
     }
     
     detectLight() {
@@ -547,5 +609,19 @@ class MorseApp {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    new MorseApp();
+    console.log('DOM Content Loaded, initializing MorseApp...');
+    const app = new MorseApp();
+    
+    // Add a test function for debugging
+    window.testAutoStart = async () => {
+        console.log('=== TESTING AUTO-START ===');
+        try {
+            await app.switchMode('receive');
+            console.log('Auto-start test completed');
+        } catch (error) {
+            console.error('Auto-start test failed:', error);
+        }
+    };
+    
+    console.log('MorseApp instance created. Use window.testAutoStart() to test auto-start.');
 });
