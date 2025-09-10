@@ -150,7 +150,7 @@ class MorseApp {
     updateCharCount() {
         const count = this.elements.messageInput.value.length;
         this.elements.charCount.textContent = count;
-        this.elements.charCount.style.color = count > 90 ? '#dc3545' : '#6c757d';
+        this.elements.charCount.style.color = count > 90 ? '#dc3545' : '#a0a0a0';
     }
     
     updateMorsePreview() {
