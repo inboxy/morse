@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1a1a1a">
+    <title>Morse Code Communicator</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <header>
+            <h1>Morse Code Communicator</h1>
+        </header>
+
+        <div class="mode-toggle">
+            <button id="transmitBtn" class="mode-btn active">TRANSMIT</button>
+            <button id="receiveBtn" class="mode-btn">RECEIVE</button>
+        </div>
+
+        <div id="transmitMode" class="mode-content">
+            <div class="input-section">
+                <textarea 
+                    id="messageInput" 
+                    placeholder="Enter your message (max 100 characters)"
+                    maxlength="100"
+                ></textarea>
+                <div class="char-counter">
+                    <span id="charCount">0</span>/100
+                </div>
+            </div>
+            
+            <div class="morse-preview">
+                <label>Morse Code:</label>
+                <div id="morseOutput"></div>
+            </div>
+
+            <button id="startTransmitBtn" class="action-btn">Start Transmission</button>
+            
+            <div id="transmissionStatus" class="status hidden">
+                <div class="status-indicator"></div>
+                <span>Transmitting...</span>
+            </div>
+        </div>
+
+        <div id="receiveMode" class="mode-content hidden">
+            <div class="camera-section">
+                <video id="cameraVideo" autoplay muted></video>
+                <canvas id="detectionCanvas" class="hidden"></canvas>
+            </div>
+            
+            <button id="startReceiveBtn" class="action-btn">Start Receiving</button>
+            <button id="stopReceiveBtn" class="action-btn hidden">Stop Receiving</button>
+            
+            <div id="receiveStatus" class="status hidden">
+                <div class="status-indicator"></div>
+                <span>Listening for signals...</span>
+            </div>
+
+            <div class="received-section">
+                <label>Received Morse:</label>
+                <div id="receivedMorse"></div>
+                
+                <label>Decoded Message:</label>
+                <div id="decodedMessage"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="morse.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
