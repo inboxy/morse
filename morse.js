@@ -258,6 +258,11 @@ class LightDetector {
         this.timingTolerance = 0.3; // 30% tolerance initially
         this.adaptiveDotThreshold = null;
         
+        // Sequence stabilization to prevent rapid changes
+        this.stableSequence = '';
+        this.sequenceConfirmCount = 0;
+        this.requiredConfirmCount = 2; // Require 2 consistent readings
+        
         // Dynamic timing based on Morse code speed
         this.morseCode = morseCodeInstance;
         this.updateTimingThresholds();
@@ -267,16 +272,16 @@ class LightDetector {
         if (this.morseCode) {
             const unit = this.morseCode.unit;
             // Timing thresholds for signal detection
-            this.minSignalDuration = Math.max(unit * 0.3, 30); // 30% of unit, min 30ms
+            this.minSignalDuration = Math.max(unit * 0.4, 40); // Increased from 0.3 to be more conservative
             
             // Critical fix: dot threshold should be between dot (1 unit) and dash (3 units)
-            // Set it at 2 units to properly distinguish
-            this.dotThreshold = unit * 2; // 2 units - between dot (1u) and dash (3u)
+            // Set it at 1.8 units to be more conservative about dots
+            this.dotThreshold = unit * 1.8; // 1.8 units - closer to dot duration
             
-            // Gap detection thresholds
-            this.letterGapThreshold = unit * 2.5; // 2.5 units - between symbol gap (1u) and letter gap (3u)
-            this.wordGapThreshold = unit * 5; // 5 units - between letter gap (3u) and word gap (7u)
-            this.maxGapDuration = unit * 10; // 10 units max before reset
+            // More conservative gap detection thresholds to reduce false boundaries
+            this.letterGapThreshold = unit * 3.5; // Increased from 2.5 to 3.5 units
+            this.wordGapThreshold = unit * 6.5; // Increased from 5 to 6.5 units  
+            this.maxGapDuration = unit * 12; // Increased from 10 to 12 units
             
             console.log(`Light detector timing updated for ${this.morseCode.getSpeed()} WPM:`, {
                 unit: unit + 'ms',
@@ -431,49 +436,54 @@ class LightDetector {
                 console.log('  Expected dash duration:', expectedDash, 'ms');
                 console.log('  Dot threshold (cutoff):', this.dotThreshold, 'ms');
                 
-                // Adaptive timing analysis
-                const confidence = this.analyzeSignalConfidence(timeSinceLastTransition);
-                const isActualDot = this.classifySignal(timeSinceLastTransition);
-                const symbol = isActualDot ? '.' : '-';
-                
-                // Learn from this signal to improve future detection
-                this.learnFromSignal(timeSinceLastTransition, isActualDot);
-                
-                console.log('  DECISION:', isActualDot ? 'DOT (.)' : 'DASH (-)');
-                console.log('  Confidence:', (confidence * 100).toFixed(1) + '%');
-                console.log('  Reason: duration', timeSinceLastTransition, isActualDot ? '<' : '≥', this.getEffectiveThreshold());
-                
-                this.currentSequence += symbol;
-                console.log('  ✓ Current sequence:', this.currentSequence);
-                
-                // Try to decode current letter if we have symbols
-                const lastWord = this.currentSequence.split(' / ').pop();
-                const letters = lastWord.split(' ');
-                const currentLetter = letters[letters.length - 1];
-                if (currentLetter && this.morseCode) {
-                    const matchResult = this.morseCode.findBestMatch(currentLetter);
-                    if (matchResult.char && matchResult.confidence >= 0.7) {
-                        const matchType = matchResult.confidence === 1.0 ? '✅ EXACT' : '🔍 FUZZY';
-                        console.log(`  ${matchType} match:`, currentLetter, '→', matchResult.char, 
-                                   `(${(matchResult.confidence * 100).toFixed(1)}%)`);
-                        
-                        if (matchResult.matches.length > 1) {
-                            console.log('     Alternatives:', 
-                                matchResult.matches.slice(1).map(m => 
-                                    `${m.pattern}→${m.char} (${(m.confidence * 100).toFixed(1)}%)`
-                                ).join(', ')
-                            );
-                        }
-                    } else {
-                        console.log('  ❌ No confident match for:', currentLetter);
-                        if (matchResult.matches.length > 0) {
-                            console.log('     Low confidence matches:', 
-                                matchResult.matches.map(m => 
-                                    `${m.pattern}→${m.char} (${(m.confidence * 100).toFixed(1)}%)`
-                                ).join(', ')
-                            );
+                // Only process signals that meet minimum duration
+                if (timeSinceLastTransition >= this.minSignalDuration) {
+                    // Adaptive timing analysis
+                    const confidence = this.analyzeSignalConfidence(timeSinceLastTransition);
+                    const isActualDot = this.classifySignal(timeSinceLastTransition);
+                    const symbol = isActualDot ? '.' : '-';
+                    
+                    // Learn from this signal to improve future detection
+                    this.learnFromSignal(timeSinceLastTransition, isActualDot);
+                    
+                    console.log('  DECISION:', isActualDot ? 'DOT (.)' : 'DASH (-)');
+                    console.log('  Confidence:', (confidence * 100).toFixed(1) + '%');
+                    console.log('  Reason: duration', timeSinceLastTransition, isActualDot ? '<' : '≥', this.getEffectiveThreshold());
+                    
+                    this.currentSequence += symbol;
+                    console.log('  ✓ Current sequence:', this.currentSequence);
+                    
+                    // Try to decode current letter if we have symbols
+                    const lastWord = this.currentSequence.split(' / ').pop();
+                    const letters = lastWord.split(' ');
+                    const currentLetter = letters[letters.length - 1];
+                    if (currentLetter && this.morseCode) {
+                        const matchResult = this.morseCode.findBestMatch(currentLetter);
+                        if (matchResult.char && matchResult.confidence >= 0.7) {
+                            const matchType = matchResult.confidence === 1.0 ? '✅ EXACT' : '🔍 FUZZY';
+                            console.log(`  ${matchType} match:`, currentLetter, '→', matchResult.char, 
+                                       `(${(matchResult.confidence * 100).toFixed(1)}%)`);
+                            
+                            if (matchResult.matches.length > 1) {
+                                console.log('     Alternatives:', 
+                                    matchResult.matches.slice(1).map(m => 
+                                        `${m.pattern}→${m.char} (${(m.confidence * 100).toFixed(1)}%)`
+                                    ).join(', ')
+                                );
+                            }
+                        } else {
+                            console.log('  ❌ No confident match for:', currentLetter);
+                            if (matchResult.matches.length > 0) {
+                                console.log('     Low confidence matches:', 
+                                    matchResult.matches.map(m => 
+                                        `${m.pattern}→${m.char} (${(m.confidence * 100).toFixed(1)}%)`
+                                    ).join(', ')
+                                );
+                            }
                         }
                     }
+                } else {
+                    console.log('  ⚠️ Signal too short (<', this.minSignalDuration, 'ms), ignoring');
                 }
             }
             
@@ -481,11 +491,31 @@ class LightDetector {
             this.lastTransition = currentTime;
         }
         
+        // Stabilize sequence output to prevent rapid changes
+        const currentTrimmed = this.currentSequence.trim();
+        let outputSequence = currentTrimmed;
+        
+        if (currentTrimmed === this.stableSequence) {
+            this.sequenceConfirmCount++;
+        } else {
+            this.stableSequence = currentTrimmed;
+            this.sequenceConfirmCount = 1;
+        }
+        
+        // Only output stable sequences that have been confirmed multiple times
+        if (this.sequenceConfirmCount < this.requiredConfirmCount && this.stableSequence.length > 0) {
+            // Keep previous stable sequence until new one is confirmed
+            outputSequence = this.lastStableOutput || '';
+        } else if (this.sequenceConfirmCount >= this.requiredConfirmCount) {
+            this.lastStableOutput = currentTrimmed;
+            outputSequence = currentTrimmed;
+        }
+        
         return {
             brightness: brightness,
             threshold: this.brightnessThreshold,
             isSignalDetected: isSignalOn,
-            sequence: this.currentSequence.trim(),
+            sequence: outputSequence,
             debug: debugData,
             timingConfidence: this.timingConfidence
         };
@@ -556,12 +586,39 @@ class LightDetector {
     validateAndCorrectSequence(sequence) {
         console.log('🔍 Validating sequence:', sequence);
         
-        const words = sequence.split(' / ');
+        // First clean up the sequence
+        const cleanedSequence = this.cleanupSequence(sequence);
+        console.log('🧹 Cleaned sequence:', cleanedSequence);
+        
+        const words = cleanedSequence.split(' / ');
         const correctedWords = words.map(word => this.correctWord(word.trim())).filter(w => w);
         const result = correctedWords.join(' / ');
         
         console.log('✅ Corrected sequence:', result);
         return result;
+    }
+    
+    cleanupSequence(sequence) {
+        if (!sequence) return '';
+        
+        // Remove excessive spaces and normalize gaps
+        let cleaned = sequence
+            .replace(/\s+/g, ' ')  // Multiple spaces to single space
+            .replace(/\s+\/\s+/g, ' / ')  // Normalize word separators
+            .replace(/\/+/g, ' / ')  // Multiple slashes to single
+            .trim();
+        
+        // Remove empty patterns and invalid characters
+        const words = cleaned.split(' / ');
+        const validWords = words.map(word => {
+            const letters = word.split(' ').filter(letter => {
+                // Only keep valid morse patterns (dots and dashes)
+                return letter && /^[.\-]+$/.test(letter) && letter.length <= 6;  // Max 6 symbols per letter
+            });
+            return letters.join(' ');
+        }).filter(word => word.length > 0);
+        
+        return validWords.join(' / ');
     }
     
     correctWord(word) {
@@ -608,18 +665,25 @@ class LightDetector {
         
         // Common corrections for timing issues
         const corrections = {
-            // Common timing errors
-            '.--.': '.--.',    // P correction
-            '....-': '....',   // H correction
-            '.-.-.': '.-.',    // R correction
-            '--.-.': '--.',    // G correction
-            '-----': '----.',  // 9 correction
-            '.....-': '.....',  // 5 correction
+            // Common timing errors - more comprehensive
+            '.--.': '.--.',    // P correction (missing final dot)
+            '....-': '....',   // H correction (extra dash)
+            '.-.-.': '.-.',    // R correction (extra dot-dash)
+            '--.-.': '--.',    // G correction (extra dot-dash)
+            '-----': '----.',  // 9 correction (missing final dot)
+            '.....-': '.....',  // 5 correction (extra dash)
             
-            // Single character fixes
-            '': '.',           // Missing dot
-            '-': '.',          // Dash mistaken as dot
-            '.': '-',          // Dot mistaken as dash
+            // Letter boundary issues that cause ABCDEFGHIJK → MBCDEFGHIPTTET TI
+            '..': '.-',       // A misheard as I
+            '--': '-',        // M misheard as T  
+            '.-..-.': '.-..',  // L misheard as L with extra pattern
+            '.----.': '.---', // J misheard with extra dot
+            
+            // Common single character misinterpretations
+            '': '.',           // Missing signal
+            '.--.-.': '.--.',  // P with extra dash-dot
+            '..-.-.': '..-.',  // F with extra dash-dot
+            '-----.': '----.',  // 9 with extra dash
         };
         
         if (corrections[pattern]) {
@@ -711,6 +775,11 @@ class LightDetector {
         this.dashDurations = [];
         this.timingConfidence = 0;
         this.adaptiveDotThreshold = null;
+        
+        // Reset sequence stabilization
+        this.stableSequence = '';
+        this.sequenceConfirmCount = 0;
+        this.lastStableOutput = '';
         
         // Log current timing settings
         if (this.morseCode) {

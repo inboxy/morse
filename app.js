@@ -885,12 +885,48 @@ function initializeApp() {
         console.log('================================\n');
     };
     
+    // Test the problematic abcdefghijk sequence
+    window.testAlphabetDecoding = () => {
+        console.log('\n🔤 TESTING ALPHABET DECODING');
+        console.log('=============================');
+        
+        const testWord = 'ABCDEFGHIJK';
+        const expectedMorse = app.morseCode.textToMorse(testWord);
+        console.log('Expected pattern for', testWord + ':', expectedMorse);
+        
+        // Test the decoding
+        const decodingResult = app.morseCode.morseToTextWithConfidence(expectedMorse);
+        console.log('Direct decode result:', decodingResult.text);
+        console.log('Confidence:', Math.round(decodingResult.overallConfidence * 100) + '%');
+        
+        // Analyze each letter individually
+        console.log('\nLetter-by-letter analysis:');
+        const letters = expectedMorse.split(' ');
+        letters.forEach((pattern, index) => {
+            if (pattern && pattern !== '/') {
+                const originalChar = testWord[index];
+                const match = app.morseCode.findBestMatch(pattern);
+                const status = match.char === originalChar ? '✅' : '❌';
+                console.log(`${status} ${originalChar}: ${pattern} → ${match.char} (${Math.round(match.confidence * 100)}%)`);
+                
+                if (match.char !== originalChar && match.matches.length > 1) {
+                    console.log('   Alternatives:', match.matches.slice(1).map(m => 
+                        `${m.pattern}→${m.char} (${Math.round(m.confidence * 100)}%)`).join(', '));
+                }
+            }
+        });
+        
+        console.log('\n✅ Alphabet decode test completed');
+        console.log('=============================\n');
+    };
+    
     console.log('Character testing functions:');
     console.log('- testCharacter(char) - show timing for specific character');
     console.log('- testCommonChars() - show common characters');
     console.log('- analyzeWord(word) - detailed analysis of word timing');
     console.log('- testHello() - quick test for HELLO word');
     console.log('- testHelloDecodeAccuracy() - comprehensive HELLO decode test');
+    console.log('- testAlphabetDecoding() - test ABCDEFGHIJK sequence');
     
     return app;
 }
