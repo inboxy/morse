@@ -177,27 +177,100 @@ class MorseApp {
         }
         
         try {
-            // Show diagnostic info first
-            this.showDiagnosticInfo();
-            
-            const { stream, track } = await this.getFlashlight();
-            this.stream = stream;
-            this.track = track;
-            
             this.isTransmitting = true;
             this.elements.transmitButton.textContent = 'Stop Transmission';
             this.elements.transmissionStatus.classList.remove('hidden');
             
+            // Show countdown before transmission starts
+            await this.showCountdown();
+            
+            if (!this.isTransmitting) return; // User stopped during countdown
+            
             const morse = this.morseCode.textToMorse(message);
             const pattern = this.morseCode.getTimingPattern(morse);
             
-            await this.executeFlashPattern(pattern);
+            // Try flashlight first, fallback to screen flash
+            try {
+                this.showDiagnosticInfo();
+                const { stream, track } = await this.getFlashlight();
+                this.stream = stream;
+                this.track = track;
+                
+                console.log('Using flashlight for transmission');
+                await this.executeFlashPattern(pattern);
+            } catch (flashlightError) {
+                console.warn('Flashlight not available, using screen flash:', flashlightError);
+                this.updateTransmissionStatus('Transmitting via screen flash...');
+                await this.executeScreenFlashPattern(pattern);
+            }
             
         } catch (error) {
             console.error('Transmission error:', error);
             alert('Error: ' + error.message + '\n\nCheck browser console for more details.');
         } finally {
             this.stopTransmission();
+        }
+    }
+    
+    async showCountdown() {
+        const statusText = this.elements.transmissionStatus.querySelector('span');
+        
+        for (let i = 3; i > 0; i--) {
+            if (!this.isTransmitting) return; // User stopped transmission
+            
+            statusText.textContent = `Starting transmission in ${i}...`;
+            await this.delay(1000);
+        }
+        
+        statusText.textContent = 'Transmitting...';
+    }
+    
+    updateTransmissionStatus(message) {
+        const statusText = this.elements.transmissionStatus.querySelector('span');
+        statusText.textContent = message;
+    }
+    
+    async executeScreenFlashPattern(pattern) {
+        try {
+            // Save original styles
+            const originalBg = document.body.style.backgroundColor;
+            const originalFilter = document.body.style.filter;
+            
+            // Set up for screen flash
+            document.body.style.transition = 'none';
+            
+            // Hide other content during screen flash for better visibility
+            this.elements.transmitMode.style.opacity = '0.3';
+            
+            for (const step of pattern) {
+                if (!this.isTransmitting) break;
+                
+                if (step.type === 'on') {
+                    // White flash
+                    document.body.style.backgroundColor = 'white';
+                    document.body.style.filter = 'brightness(10)';
+                    await this.delay(step.duration);
+                    
+                    // Black flash
+                    document.body.style.backgroundColor = 'black';
+                    document.body.style.filter = 'brightness(0.1)';
+                } else {
+                    // Gap (normal background)
+                    document.body.style.backgroundColor = originalBg;
+                    document.body.style.filter = originalFilter;
+                    await this.delay(step.duration);
+                }
+            }
+            
+            // Restore original styles
+            document.body.style.backgroundColor = originalBg;
+            document.body.style.filter = originalFilter;
+            document.body.style.transition = '';
+            this.elements.transmitMode.style.opacity = '';
+            
+        } catch (error) {
+            console.error('Error executing screen flash pattern:', error);
+            throw error;
         }
     }
     
@@ -243,6 +316,12 @@ class MorseApp {
         this.isTransmitting = false;
         this.elements.transmitButton.textContent = 'Start Transmission';
         this.elements.transmissionStatus.classList.add('hidden');
+        
+        // Reset screen flash styles
+        document.body.style.backgroundColor = '';
+        document.body.style.filter = '';
+        document.body.style.transition = '';
+        this.elements.transmitMode.style.opacity = '';
         
         if (this.track) {
             this.setFlashlight(false);

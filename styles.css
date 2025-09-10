@@ -9,6 +9,7 @@ body {
     background: #f0f0f0;
     color: #333;
     line-height: 1.6;
+    transition: background-color 0.05s ease, filter 0.05s ease;
 }
 
 .app {
