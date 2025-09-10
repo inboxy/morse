@@ -95,20 +95,54 @@ class MorseApp {
     
     async getFlashlight() {
         try {
+            // Check if we're in a secure context
+            if (!window.isSecureContext) {
+                throw new Error('Flashlight requires HTTPS or localhost');
+            }
+
+            // Check if getUserMedia is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('Camera API not available in this browser');
+            }
+
+            console.log('Requesting camera access...');
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' }
+                video: { 
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
             });
             
             const track = stream.getVideoTracks()[0];
+            console.log('Camera track obtained:', track.label);
+            
             const capabilities = track.getCapabilities();
+            console.log('Camera capabilities:', capabilities);
             
             if (!capabilities.torch) {
-                throw new Error('Flashlight not supported on this device');
+                // Try alternative approaches
+                const settings = track.getSettings();
+                console.log('Camera settings:', settings);
+                
+                throw new Error(`Flashlight not supported on this device. Camera: ${track.label || 'Unknown'}`);
             }
             
+            console.log('Flashlight support confirmed');
             return { stream, track };
         } catch (error) {
-            throw new Error('Could not access camera flashlight: ' + error.message);
+            console.error('Flashlight access error:', error);
+            
+            // Provide more specific error messages
+            if (error.name === 'NotAllowedError') {
+                throw new Error('Camera permission denied. Please allow camera access and try again.');
+            } else if (error.name === 'NotFoundError') {
+                throw new Error('No camera found on this device.');
+            } else if (error.name === 'NotSupportedError') {
+                throw new Error('Camera not supported in this browser.');
+            } else {
+                throw new Error('Could not access camera flashlight: ' + error.message);
+            }
         }
     }
     
@@ -142,6 +176,9 @@ class MorseApp {
         }
         
         try {
+            // Show diagnostic info first
+            this.showDiagnosticInfo();
+            
             const { stream, track } = await this.getFlashlight();
             this.stream = stream;
             this.track = track;
@@ -156,9 +193,29 @@ class MorseApp {
             await this.executeFlashPattern(pattern);
             
         } catch (error) {
-            alert('Error: ' + error.message);
+            console.error('Transmission error:', error);
+            alert('Error: ' + error.message + '\n\nCheck browser console for more details.');
         } finally {
             this.stopTransmission();
+        }
+    }
+    
+    showDiagnosticInfo() {
+        console.log('=== FLASHLIGHT DIAGNOSTIC ===');
+        console.log('User Agent:', navigator.userAgent);
+        console.log('Secure Context:', window.isSecureContext);
+        console.log('Protocol:', window.location.protocol);
+        console.log('Host:', window.location.host);
+        console.log('MediaDevices available:', !!navigator.mediaDevices);
+        console.log('getUserMedia available:', !!navigator.mediaDevices?.getUserMedia);
+        
+        // Check for known problematic browsers/versions
+        const isChrome = /Chrome/.test(navigator.userAgent);
+        const chromeVersion = isChrome ? parseInt(navigator.userAgent.match(/Chrome\/(\d+)/)?.[1] || '0') : 0;
+        console.log('Chrome version:', chromeVersion);
+        
+        if (chromeVersion < 88) {
+            console.warn('Chrome version may not support torch API (requires 88+)');
         }
     }
     
