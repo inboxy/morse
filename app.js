@@ -16,9 +16,13 @@ class MorseApp {
         this.registerServiceWorker();
         
         console.log('MorseApp initialized');
+        
+        // Check browser capabilities immediately
+        this.checkBrowserCapabilities();
     }
     
     initializeElements() {
+        console.log('=== INITIALIZING ELEMENTS ===');
         this.elements = {
             transmitBtn: document.getElementById('transmitBtn'),
             receiveBtn: document.getElementById('receiveBtn'),
@@ -36,6 +40,16 @@ class MorseApp {
             receivedMorse: document.getElementById('receivedMorse'),
             decodedMessage: document.getElementById('decodedMessage')
         };
+        
+        // Check if critical elements exist
+        console.log('receiveBtn found:', !!this.elements.receiveBtn);
+        console.log('receiveMode found:', !!this.elements.receiveMode);
+        console.log('cameraVideo found:', !!this.elements.cameraVideo);
+        console.log('receiveStatus found:', !!this.elements.receiveStatus);
+        
+        if (!this.elements.receiveBtn) {
+            console.error('CRITICAL: receiveBtn not found!');
+        }
     }
     
     setupEventListeners() {
@@ -48,9 +62,14 @@ class MorseApp {
         
         this.elements.receiveBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            console.log('Receive button clicked, switching to receive mode...');
+            console.log('=== RECEIVE BUTTON CLICKED ===');
+            console.log('Event target:', e.target);
+            console.log('Current mode before switch:', this.currentMode);
+            console.log('Is receiving before switch:', this.isReceiving);
+            
             this.switchMode('receive').catch(error => {
-                console.error('Error switching to receive mode:', error);
+                console.error('ERROR in switchMode:', error);
+                alert('Failed to switch to receive mode: ' + error.message);
             });
         });
         
@@ -598,6 +617,33 @@ class MorseApp {
         }
     }
     
+    checkBrowserCapabilities() {
+        console.log('=== BROWSER CAPABILITIES CHECK ===');
+        console.log('navigator.mediaDevices:', !!navigator.mediaDevices);
+        console.log('getUserMedia available:', !!navigator.mediaDevices?.getUserMedia);
+        console.log('Secure context:', window.isSecureContext);
+        console.log('Protocol:', window.location.protocol);
+        console.log('Hostname:', window.location.hostname);
+        
+        if (!navigator.mediaDevices) {
+            console.error('MediaDevices API not available');
+            return false;
+        }
+        
+        if (!navigator.mediaDevices.getUserMedia) {
+            console.error('getUserMedia not available');
+            return false;
+        }
+        
+        if (!window.isSecureContext) {
+            console.warn('Not in secure context - camera may not work');
+            return false;
+        }
+        
+        console.log('Browser capabilities check passed');
+        return true;
+    }
+    
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -619,4 +665,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     console.log('MorseApp instance created. Use window.testAutoStart() to test auto-start.');
+    
+    // Also add a simple mode switch test
+    window.testModeSwitch = () => {
+        console.log('=== TESTING MODE SWITCH ===');
+        console.log('Current mode:', app.currentMode);
+        app.switchMode('receive').then(() => {
+            console.log('Mode switch completed, new mode:', app.currentMode);
+        }).catch(error => {
+            console.error('Mode switch failed:', error);
+        });
+    };
 });
