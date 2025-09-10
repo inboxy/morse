@@ -235,8 +235,16 @@ header h1 {
 }
 
 @media (max-width: 480px) {
+    body {
+        margin: 0;
+        padding: 10px;
+    }
+    
     .app {
         padding: 15px;
+        margin: 0;
+        border-radius: 0;
+        min-height: calc(100vh - 20px);
     }
     
     header h1 {
@@ -246,5 +254,19 @@ header h1 {
     .mode-btn {
         padding: 10px 15px;
         font-size: 14px;
+    }
+    
+    #messageInput {
+        min-height: 80px;
+        font-size: 14px;
+    }
+    
+    #cameraVideo {
+        height: 250px;
+        max-width: 100%;
+    }
+    
+    .morse-preview, .status, #receivedMorse, #decodedMessage {
+        padding: 10px;
     }
 }

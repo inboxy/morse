@@ -3,12 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2a2a2a">
     <title>Morse Code Test</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .mode-btn { padding: 10px 20px; margin: 5px; }
-        .active { background: blue; color: white; }
-        .hidden { display: none; }
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #2a2a2a;
+            color: #e0e0e0;
+        }
+        .mode-btn { 
+            padding: 10px 20px; 
+            margin: 5px; 
+            background: #4a4a4a;
+            color: #c0c0c0;
+            border: 1px solid #555;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .active { 
+            background: #007bff; 
+            color: white; 
+        }
+        .hidden { 
+            display: none; 
+        }
+        h1, h2 {
+            color: #f0f0f0;
+        }
+        textarea {
+            background: #3a3a3a;
+            color: #e0e0e0;
+            border: 2px solid #555;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        video {
+            border: 2px solid #555;
+            border-radius: 8px;
+        }
+        button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #218838;
+        }
+        div {
+            margin: 10px 0;
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            background: #28a745;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
     </style>
 </head>
 <body>
