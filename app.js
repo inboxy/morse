@@ -624,8 +624,29 @@ class MorseApp {
                 this.elements.receivedMorse.textContent = result.sequence;
                 
                 if (result.sequence.trim()) {
-                    const decoded = this.morseCode.morseToText(result.sequence);
-                    this.elements.decodedMessage.textContent = decoded;
+                    // Apply error correction and validation
+                    const correctedSequence = this.lightDetector.validateAndCorrectSequence(result.sequence);
+                    const decodingResult = this.morseCode.morseToTextWithConfidence(correctedSequence);
+                    
+                    // Display the decoded message with confidence indicator
+                    const confidencePercent = Math.round(decodingResult.overallConfidence * 100);
+                    let displayText = decodingResult.text;
+                    
+                    if (confidencePercent < 80) {
+                        displayText += ` [${confidencePercent}% confidence]`;
+                    }
+                    
+                    this.elements.decodedMessage.textContent = displayText;
+                    
+                    // Log quality analysis for debugging
+                    const quality = this.lightDetector.analyzeSequenceQuality(result.sequence);
+                    console.log('📈 Decoding quality:', {
+                        original: result.sequence,
+                        corrected: correctedSequence,
+                        decoded: decodingResult.text,
+                        confidence: confidencePercent + '%',
+                        recognitionRate: Math.round(quality.recognitionRate * 100) + '%'
+                    });
                 }
             }
         }
@@ -818,11 +839,58 @@ function initializeApp() {
     // Quick test for HELLO
     window.testHello = () => analyzeWord('HELLO');
     
+    // Test decode accuracy with the problematic HELLO sequence
+    window.testHelloDecodeAccuracy = () => {
+        console.log('\n🧪 TESTING HELLO DECODE ACCURACY');
+        console.log('================================');
+        
+        const expectedHello = app.morseCode.textToMorse('HELLO');
+        console.log('Expected HELLO pattern:', expectedHello);
+        
+        // Test various timing scenarios that might cause HELLO → ECZDO
+        const testScenarios = [
+            expectedHello, // Perfect timing
+            '.... . .-.. .-.. ---', // Standard spacing
+            '....  .  .-..  .-..  ---', // Extra gaps
+            '... . .-.. .-.. ---', // H as three dots instead of four
+            '.... . .-.  .-.. ---', // L as dot-dash instead of dot-dash-dot-dot
+        ];
+        
+        console.log('\nTesting decode scenarios:');
+        testScenarios.forEach((pattern, index) => {
+            console.log(`\nScenario ${index + 1}: "${pattern}"`);
+            const decodingResult = app.morseCode.morseToTextWithConfidence(pattern);
+            console.log(`  Raw decode: "${decodingResult.text}"`);
+            console.log(`  Confidence: ${Math.round(decodingResult.overallConfidence * 100)}%`);
+            
+            // Try error correction
+            if (app.lightDetector) {
+                const corrected = app.lightDetector.validateAndCorrectSequence(pattern);
+                if (corrected !== pattern) {
+                    const correctedResult = app.morseCode.morseToTextWithConfidence(corrected);
+                    console.log(`  Corrected: "${corrected}" → "${correctedResult.text}"`);
+                }
+            }
+        });
+        
+        console.log('\nTiming thresholds analysis:');
+        if (app.lightDetector) {
+            console.log('- Dot threshold:', app.lightDetector.dotThreshold, 'ms');
+            console.log('- Adaptive threshold:', app.lightDetector.adaptiveDotThreshold || 'Not set');
+            console.log('- Min signal duration:', app.lightDetector.minSignalDuration, 'ms');
+            console.log('- Letter gap threshold:', app.lightDetector.letterGapThreshold, 'ms');
+        }
+        
+        console.log('\n✅ HELLO decode test completed');
+        console.log('================================\n');
+    };
+    
     console.log('Character testing functions:');
     console.log('- testCharacter(char) - show timing for specific character');
     console.log('- testCommonChars() - show common characters');
     console.log('- analyzeWord(word) - detailed analysis of word timing');
     console.log('- testHello() - quick test for HELLO word');
+    console.log('- testHelloDecodeAccuracy() - comprehensive HELLO decode test');
     
     return app;
 }

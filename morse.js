@@ -552,6 +552,145 @@ class LightDetector {
         });
     }
     
+    // Error correction and validation methods
+    validateAndCorrectSequence(sequence) {
+        console.log('🔍 Validating sequence:', sequence);
+        
+        const words = sequence.split(' / ');
+        const correctedWords = words.map(word => this.correctWord(word.trim())).filter(w => w);
+        const result = correctedWords.join(' / ');
+        
+        console.log('✅ Corrected sequence:', result);
+        return result;
+    }
+    
+    correctWord(word) {
+        if (!word) return '';
+        
+        const letters = word.split(' ').filter(l => l);
+        const correctedLetters = [];
+        
+        for (let i = 0; i < letters.length; i++) {
+            const letter = letters[i];
+            const match = this.morseCode.findBestMatch(letter, 0.4);
+            
+            if (match.char && match.confidence >= 0.6) {
+                correctedLetters.push({
+                    original: letter,
+                    corrected: match.matches[0].pattern,
+                    char: match.char,
+                    confidence: match.confidence
+                });
+            } else {
+                // Try context-based correction
+                const contextMatch = this.tryContextCorrection(letter, letters, i);
+                if (contextMatch) {
+                    correctedLetters.push(contextMatch);
+                } else {
+                    console.log('❌ Could not correct pattern:', letter);
+                    // Include as-is for debugging
+                    correctedLetters.push({
+                        original: letter,
+                        corrected: letter,
+                        char: '?',
+                        confidence: 0
+                    });
+                }
+            }
+        }
+        
+        return correctedLetters.map(l => l.corrected).join(' ');
+    }
+    
+    tryContextCorrection(pattern, allLetters, position) {
+        // Try to correct based on context and common patterns
+        console.log('🔧 Attempting context correction for:', pattern);
+        
+        // Common corrections for timing issues
+        const corrections = {
+            // Common timing errors
+            '.--.': '.--.',    // P correction
+            '....-': '....',   // H correction
+            '.-.-.': '.-.',    // R correction
+            '--.-.': '--.',    // G correction
+            '-----': '----.',  // 9 correction
+            '.....-': '.....',  // 5 correction
+            
+            // Single character fixes
+            '': '.',           // Missing dot
+            '-': '.',          // Dash mistaken as dot
+            '.': '-',          // Dot mistaken as dash
+        };
+        
+        if (corrections[pattern]) {
+            const correctedPattern = corrections[pattern];
+            const match = this.morseCode.findBestMatch(correctedPattern);
+            if (match.char) {
+                console.log('✅ Context correction:', pattern, '→', correctedPattern, '→', match.char);
+                return {
+                    original: pattern,
+                    corrected: correctedPattern,
+                    char: match.char,
+                    confidence: 0.8
+                };
+            }
+        }
+        
+        // Try adding/removing single symbols
+        const variations = [
+            pattern + '.',      // Add dot
+            pattern + '-',      // Add dash
+            pattern.slice(0, -1), // Remove last symbol
+            '.' + pattern,      // Prepend dot
+            '-' + pattern       // Prepend dash
+        ];
+        
+        for (const variation of variations) {
+            const match = this.morseCode.findBestMatch(variation, 0.7);
+            if (match.char && match.confidence >= 0.7) {
+                console.log('✅ Variation correction:', pattern, '→', variation, '→', match.char);
+                return {
+                    original: pattern,
+                    corrected: variation,
+                    char: match.char,
+                    confidence: match.confidence * 0.9 // Reduce confidence for variations
+                };
+            }
+        }
+        
+        return null;
+    }
+    
+    analyzeSequenceQuality(sequence) {
+        const words = sequence.split(' / ');
+        let totalLetters = 0;
+        let recognizedLetters = 0;
+        let totalConfidence = 0;
+        
+        for (const word of words) {
+            const letters = word.split(' ').filter(l => l);
+            for (const letter of letters) {
+                totalLetters++;
+                const match = this.morseCode.findBestMatch(letter, 0.4);
+                if (match.char && match.confidence >= 0.6) {
+                    recognizedLetters++;
+                    totalConfidence += match.confidence;
+                }
+            }
+        }
+        
+        const recognitionRate = totalLetters > 0 ? recognizedLetters / totalLetters : 0;
+        const avgConfidence = recognizedLetters > 0 ? totalConfidence / recognizedLetters : 0;
+        
+        return {
+            totalLetters,
+            recognizedLetters,
+            recognitionRate,
+            avgConfidence,
+            quality: Math.min(recognitionRate, avgConfidence)
+        };
+    }
+    
     reset() {
         console.log('=== LIGHT DETECTOR RESET ===');
         this.currentSequence = '';
