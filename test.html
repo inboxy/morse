@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Morse Code Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .mode-btn { padding: 10px 20px; margin: 5px; }
+        .active { background: blue; color: white; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Morse Code Test</h1>
+    
+    <div>
+        <button id="transmitBtn" class="mode-btn active">TRANSMIT</button>
+        <button id="receiveBtn" class="mode-btn">RECEIVE</button>
+    </div>
+    
+    <div id="transmitMode">
+        <h2>Transmit Mode</h2>
+        <textarea id="messageInput" placeholder="Enter message"></textarea>
+        <div id="charCount">0</div>
+        <div id="morseOutput"></div>
+        <button id="startTransmitBtn">Start Transmission</button>
+        <div id="transmissionStatus" class="hidden">
+            <span>Status</span>
+        </div>
+    </div>
+    
+    <div id="receiveMode" class="hidden">
+        <h2>Receive Mode</h2>
+        <video id="cameraVideo"></video>
+        <canvas id="detectionCanvas" class="hidden"></canvas>
+        <button id="stopReceiveBtn" class="hidden">Stop Receiving</button>
+        <div id="receiveStatus" class="hidden">
+            <div class="status-indicator"></div>
+            <span>Status</span>
+        </div>
+        <div id="receivedMorse"></div>
+        <div id="decodedMessage"></div>
+    </div>
+
+    <script>
+        console.log('Test page loaded');
+        console.log('receiveBtn exists:', !!document.getElementById('receiveBtn'));
+        console.log('transmitBtn exists:', !!document.getElementById('transmitBtn'));
+        
+        // Simple test
+        document.getElementById('receiveBtn').addEventListener('click', function() {
+            console.log('Receive button clicked successfully!');
+            alert('Receive button works!');
+        });
+    </script>
+</body>
+</html>

@@ -1,3 +1,9 @@
+// Debug DOM state immediately
+console.log('=== SCRIPT LOADING DEBUG ===');
+console.log('Document ready state:', document.readyState);
+console.log('receiveBtn exists at script load:', !!document.getElementById('receiveBtn'));
+console.log('transmitBtn exists at script load:', !!document.getElementById('transmitBtn'));
+
 class MorseApp {
     constructor() {
         this.morseCode = new MorseCode();
@@ -675,8 +681,22 @@ class MorseApp {
 
 // Wait for DOM to be ready
 function initializeApp() {
-    console.log('Initializing MorseApp...');
+    console.log('=== INITIALIZING APP ===');
     console.log('Document ready state:', document.readyState);
+    
+    // Final check before creating app
+    const receiveBtn = document.getElementById('receiveBtn');
+    const transmitBtn = document.getElementById('transmitBtn');
+    
+    console.log('Final element check:');
+    console.log('receiveBtn:', !!receiveBtn);
+    console.log('transmitBtn:', !!transmitBtn);
+    
+    if (!receiveBtn || !transmitBtn) {
+        console.error('FATAL: Critical elements still missing, cannot initialize app');
+        alert('App initialization failed - please refresh the page');
+        return null;
+    }
     
     const app = new MorseApp();
     
