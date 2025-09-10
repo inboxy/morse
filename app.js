@@ -53,33 +53,57 @@ class MorseApp {
     }
     
     setupEventListeners() {
-        this.elements.transmitBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.switchMode('transmit').catch(error => {
-                console.error('Error switching to transmit mode:', error);
+        console.log('=== SETTING UP EVENT LISTENERS ===');
+        
+        // Check each element before adding listeners
+        if (this.elements.transmitBtn) {
+            this.elements.transmitBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.switchMode('transmit').catch(error => {
+                    console.error('Error switching to transmit mode:', error);
+                });
             });
-        });
+            console.log('transmitBtn event listener added');
+        } else {
+            console.error('transmitBtn not found - cannot add event listener');
+        }
         
-        this.elements.receiveBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            console.log('=== RECEIVE BUTTON CLICKED ===');
-            console.log('Event target:', e.target);
-            console.log('Current mode before switch:', this.currentMode);
-            console.log('Is receiving before switch:', this.isReceiving);
-            
-            this.switchMode('receive').catch(error => {
-                console.error('ERROR in switchMode:', error);
-                alert('Failed to switch to receive mode: ' + error.message);
+        if (this.elements.receiveBtn) {
+            this.elements.receiveBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('=== RECEIVE BUTTON CLICKED ===');
+                console.log('Event target:', e.target);
+                console.log('Current mode before switch:', this.currentMode);
+                console.log('Is receiving before switch:', this.isReceiving);
+                
+                this.switchMode('receive').catch(error => {
+                    console.error('ERROR in switchMode:', error);
+                    alert('Failed to switch to receive mode: ' + error.message);
+                });
             });
-        });
+            console.log('receiveBtn event listener added');
+        } else {
+            console.error('receiveBtn not found - cannot add event listener');
+        }
         
-        this.elements.messageInput.addEventListener('input', () => this.updateMorsePreview());
-        this.elements.transmitButton.addEventListener('click', () => this.startTransmission());
+        if (this.elements.messageInput) {
+            this.elements.messageInput.addEventListener('input', () => this.updateMorsePreview());
+            this.elements.messageInput.addEventListener('input', () => this.updateCharCount());
+            console.log('messageInput event listeners added');
+        }
         
-        this.elements.stopReceiveBtn.addEventListener('click', () => this.stopReceiving());
+        if (this.elements.transmitButton) {
+            this.elements.transmitButton.addEventListener('click', () => this.startTransmission());
+            console.log('transmitButton event listener added');
+        }
+        
+        if (this.elements.stopReceiveBtn) {
+            this.elements.stopReceiveBtn.addEventListener('click', () => this.stopReceiving());
+            console.log('stopReceiveBtn event listener added');
+        }
         
         this.updateCharCount();
-        this.elements.messageInput.addEventListener('input', () => this.updateCharCount());
+        console.log('Event listeners setup complete');
     }
     
     async registerServiceWorker() {
@@ -649,8 +673,11 @@ class MorseApp {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM Content Loaded, initializing MorseApp...');
+// Wait for DOM to be ready
+function initializeApp() {
+    console.log('Initializing MorseApp...');
+    console.log('Document ready state:', document.readyState);
+    
     const app = new MorseApp();
     
     // Add a test function for debugging
@@ -676,4 +703,45 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Mode switch failed:', error);
         });
     };
-});
+    
+    return app;
+}
+
+// Multiple ways to ensure DOM is ready
+console.log('Script loaded, document.readyState:', document.readyState);
+
+let appInitialized = false;
+
+function safeInitializeApp() {
+    if (appInitialized) {
+        console.log('App already initialized, skipping...');
+        return;
+    }
+    
+    // Check if critical elements exist
+    const receiveBtn = document.getElementById('receiveBtn');
+    const transmitBtn = document.getElementById('transmitBtn');
+    
+    if (!receiveBtn || !transmitBtn) {
+        console.error('Critical elements not found yet:', {
+            receiveBtn: !!receiveBtn,
+            transmitBtn: !!transmitBtn
+        });
+        
+        // Try again in 100ms
+        setTimeout(safeInitializeApp, 100);
+        return;
+    }
+    
+    console.log('All critical elements found, initializing app...');
+    appInitialized = true;
+    initializeApp();
+}
+
+if (document.readyState === 'loading') {
+    console.log('DOM still loading, waiting for DOMContentLoaded...');
+    document.addEventListener('DOMContentLoaded', safeInitializeApp);
+} else {
+    console.log('DOM already ready, initializing...');
+    safeInitializeApp();
+}
