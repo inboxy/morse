@@ -7,7 +7,7 @@ console.log('transmitBtn exists at script load:', !!document.getElementById('tra
 class MorseApp {
     constructor() {
         this.morseCode = new MorseCode();
-        this.lightDetector = new LightDetector();
+        this.lightDetector = new LightDetector(this.morseCode);
         this.currentMode = 'transmit';
         this.isTransmitting = false;
         this.isReceiving = false;
@@ -22,6 +22,7 @@ class MorseApp {
         this.registerServiceWorker();
         
         console.log('MorseApp initialized');
+        console.log(`Default speed: ${this.morseCode.getSpeed()} WPM`);
         
         // Check browser capabilities immediately
         this.checkBrowserCapabilities();
@@ -686,6 +687,16 @@ class MorseApp {
         return true;
     }
     
+    setMorseSpeed(wpm) {
+        this.morseCode.setSpeed(wpm);
+        this.lightDetector.updateTimingThresholds();
+        console.log(`Morse code speed changed to ${wpm} WPM`);
+    }
+    
+    getMorseSpeed() {
+        return this.morseCode.getSpeed();
+    }
+    
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -735,6 +746,56 @@ function initializeApp() {
             console.error('Mode switch failed:', error);
         });
     };
+    
+    // Speed control functions
+    window.setSpeed = (wpm) => {
+        app.setMorseSpeed(wpm);
+        return `Speed set to ${wpm} WPM`;
+    };
+    
+    window.getSpeed = () => {
+        return `Current speed: ${app.getMorseSpeed()} WPM`;
+    };
+    
+    // Preset speeds
+    window.setSlowSpeed = () => window.setSpeed(5);     // 5 WPM - very slow
+    window.setNormalSpeed = () => window.setSpeed(10);  // 10 WPM - default
+    window.setFastSpeed = () => window.setSpeed(20);    // 20 WPM - fast
+    window.setProSpeed = () => window.setSpeed(30);     // 30 WPM - professional
+    
+    console.log('Speed control functions available:');
+    console.log('- setSpeed(wpm) - set custom speed');
+    console.log('- getSpeed() - show current speed');
+    console.log('- setSlowSpeed() - 5 WPM');
+    console.log('- setNormalSpeed() - 10 WPM');
+    console.log('- setFastSpeed() - 20 WPM');
+    console.log('- setProSpeed() - 30 WPM');
+    
+    // Test character detection accuracy
+    window.testCharacter = (char) => {
+        const morse = app.morseCode.textToMorse(char);
+        console.log(`Testing character "${char}" (${morse}):`);
+        console.log('Expected timing pattern:');
+        const pattern = app.morseCode.getTimingPattern(morse);
+        pattern.forEach((step, i) => {
+            console.log(`  ${i + 1}. ${step.type} for ${step.duration}ms`);
+        });
+        return `Test setup for "${char}" (${morse})`;
+    };
+    
+    window.testCommonChars = () => {
+        const common = ['E', 'T', 'A', 'O', 'I', 'N', 'S', 'H', 'R'];
+        console.log('=== TESTING COMMON CHARACTERS ===');
+        common.forEach(char => {
+            const morse = app.morseCode.textToMorse(char);
+            console.log(`${char}: ${morse}`);
+        });
+        return 'Common characters test logged';
+    };
+    
+    console.log('Character testing functions:');
+    console.log('- testCharacter(char) - show timing for specific character');
+    console.log('- testCommonChars() - show common characters');
     
     return app;
 }
