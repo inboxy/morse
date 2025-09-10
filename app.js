@@ -38,8 +38,8 @@ class MorseApp {
     }
     
     setupEventListeners() {
-        this.elements.transmitBtn.addEventListener('click', () => this.switchMode('transmit'));
-        this.elements.receiveBtn.addEventListener('click', () => this.switchMode('receive'));
+        this.elements.transmitBtn.addEventListener('click', async () => await this.switchMode('transmit'));
+        this.elements.receiveBtn.addEventListener('click', async () => await this.switchMode('receive'));
         
         this.elements.messageInput.addEventListener('input', () => this.updateMorsePreview());
         this.elements.transmitButton.addEventListener('click', () => this.startTransmission());
@@ -62,7 +62,7 @@ class MorseApp {
         }
     }
     
-    switchMode(mode) {
+    async switchMode(mode) {
         this.currentMode = mode;
         
         this.elements.transmitBtn.classList.toggle('active', mode === 'transmit');
@@ -76,6 +76,7 @@ class MorseApp {
         
         if (mode === 'receive') {
             this.stopTransmission();
+            await this.autoStartReceiving();
         } else {
             this.stopReceiving();
         }
@@ -255,20 +256,62 @@ class MorseApp {
         }
     }
     
+    async autoStartReceiving() {
+        try {
+            this.showReceiveStatus('Initializing camera...', 'loading');
+            await this.startReceiving();
+        } catch (error) {
+            console.error('Auto-start receiving failed:', error);
+            this.handleCameraError(error);
+        }
+    }
+    
+    handleCameraError(error) {
+        let message = 'Camera initialization failed. ';
+        
+        if (error.name === 'NotAllowedError') {
+            message += 'Please allow camera access and try again.';
+        } else if (error.name === 'NotFoundError') {
+            message += 'No camera found on this device.';
+        } else if (error.name === 'NotSupportedError') {
+            message += 'Camera not supported in this browser.';
+        } else if (error.name === 'NotReadableError') {
+            message += 'Camera is in use by another application.';
+        } else {
+            message += 'Click "Start Receiving" to try again.';
+        }
+        
+        this.showReceiveStatus(message, 'error');
+        
+        // Show manual start button as fallback
+        this.elements.startReceiveBtn.classList.remove('hidden');
+        this.elements.stopReceiveBtn.classList.add('hidden');
+    }
+
     async startReceiving() {
         if (this.isReceiving) return;
         
         try {
+            this.showReceiveStatus('Requesting camera access...', 'loading');
+            
             this.stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user' }
+                video: { 
+                    facingMode: 'user',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
             });
             
             this.elements.cameraVideo.srcObject = this.stream;
+            
+            // Wait for camera to be ready
+            await this.waitForCameraReady();
+            
             this.isReceiving = true;
             
             this.elements.startReceiveBtn.classList.add('hidden');
             this.elements.stopReceiveBtn.classList.remove('hidden');
-            this.elements.receiveStatus.classList.remove('hidden');
+            this.showReceiveStatus('Listening for signals...', 'active');
             
             this.canvas = this.elements.detectionCanvas;
             this.ctx = this.canvas.getContext('2d');
@@ -285,8 +328,55 @@ class MorseApp {
             
         } catch (error) {
             console.error('Camera access error:', error);
-            alert('Could not access camera: ' + error.message);
+            this.handleCameraError(error);
             this.stopReceiving();
+        }
+    }
+    
+    async waitForCameraReady() {
+        return new Promise((resolve, reject) => {
+            const video = this.elements.cameraVideo;
+            
+            const onLoadedMetadata = () => {
+                video.removeEventListener('loadedmetadata', onLoadedMetadata);
+                video.removeEventListener('error', onError);
+                resolve();
+            };
+            
+            const onError = (error) => {
+                video.removeEventListener('loadedmetadata', onLoadedMetadata);
+                video.removeEventListener('error', onError);
+                reject(error);
+            };
+            
+            video.addEventListener('loadedmetadata', onLoadedMetadata);
+            video.addEventListener('error', onError);
+            
+            // Timeout after 10 seconds
+            setTimeout(() => {
+                video.removeEventListener('loadedmetadata', onLoadedMetadata);
+                video.removeEventListener('error', onError);
+                resolve(); // Resolve anyway to continue
+            }, 10000);
+        });
+    }
+    
+    showReceiveStatus(message, type = 'active') {
+        const statusElement = this.elements.receiveStatus;
+        const statusText = statusElement.querySelector('span');
+        const statusIndicator = statusElement.querySelector('.status-indicator');
+        
+        statusText.textContent = message;
+        statusElement.classList.remove('hidden');
+        
+        // Update indicator style based on type
+        statusIndicator.className = 'status-indicator';
+        if (type === 'loading') {
+            statusIndicator.classList.add('loading');
+        } else if (type === 'error') {
+            statusIndicator.classList.add('error');
+        } else {
+            statusIndicator.classList.add('active');
         }
     }
     
@@ -345,6 +435,12 @@ class MorseApp {
         }
         
         this.elements.cameraVideo.srcObject = null;
+        
+        // Reset status indicator
+        const statusIndicator = this.elements.receiveStatus.querySelector('.status-indicator');
+        if (statusIndicator) {
+            statusIndicator.className = 'status-indicator';
+        }
     }
     
     delay(ms) {

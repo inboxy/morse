@@ -159,10 +159,30 @@ header h1 {
     animation: pulse 2s infinite;
 }
 
+.status-indicator.loading {
+    background: #007bff;
+    animation: spin 1s linear infinite;
+}
+
+.status-indicator.error {
+    background: #dc3545;
+    animation: none;
+}
+
+.status-indicator.active {
+    background: #28a745;
+    animation: pulse 2s infinite;
+}
+
 @keyframes pulse {
     0% { opacity: 1; }
     50% { opacity: 0.5; }
     100% { opacity: 1; }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 .camera-section {
