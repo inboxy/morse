@@ -294,13 +294,27 @@ class MorseApp {
         try {
             this.showReceiveStatus('Requesting camera access...', 'loading');
             
-            this.stream = await navigator.mediaDevices.getUserMedia({
-                video: { 
-                    facingMode: 'user',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                }
-            });
+            // Try back camera first, fallback to front camera
+            try {
+                this.stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: { exact: 'environment' },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                console.log('Using back camera for light detection');
+            } catch (backCameraError) {
+                console.warn('Back camera not available, falling back to front camera:', backCameraError);
+                this.stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: 'user',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                console.log('Using front camera for light detection');
+            }
             
             this.elements.cameraVideo.srcObject = this.stream;
             
@@ -311,7 +325,12 @@ class MorseApp {
             
             this.elements.startReceiveBtn.classList.add('hidden');
             this.elements.stopReceiveBtn.classList.remove('hidden');
-            this.showReceiveStatus('Listening for signals...', 'active');
+            
+            // Show which camera is being used
+            const track = this.stream.getVideoTracks()[0];
+            const settings = track.getSettings();
+            const cameraType = settings.facingMode === 'environment' ? 'back' : 'front';
+            this.showReceiveStatus(`Listening for signals (${cameraType} camera)...`, 'active');
             
             this.canvas = this.elements.detectionCanvas;
             this.ctx = this.canvas.getContext('2d');
