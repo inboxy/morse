@@ -297,46 +297,61 @@ class MorseApp {
     
     async executeScreenFlashPattern(pattern) {
         try {
-            // Save original styles
-            const originalBg = document.body.style.backgroundColor;
-            const originalFilter = document.body.style.filter;
+            console.log('Starting full-screen flash pattern');
             
-            // Set up for screen flash
-            document.body.style.transition = 'none';
+            // Enable fullscreen flash mode
+            document.body.classList.add('fullscreen-flash');
             
-            // Hide other content during screen flash for better visibility
-            this.elements.transmitMode.style.opacity = '0.3';
+            // Hide all content during screen flash
+            this.elements.transmitMode.style.opacity = '0';
+            if (this.elements.receiveMode) {
+                this.elements.receiveMode.style.opacity = '0';
+            }
             
             for (const step of pattern) {
                 if (!this.isTransmitting) break;
                 
                 if (step.type === 'on') {
-                    // White flash
-                    document.body.style.backgroundColor = 'white';
-                    document.body.style.filter = 'brightness(10)';
+                    // Maximum white flash - covers entire screen
+                    document.body.style.backgroundColor = '#ffffff';
+                    document.body.style.filter = 'brightness(2) contrast(1.5)';
+                    console.log(`White flash for ${step.duration}ms`);
                     await this.delay(step.duration);
-                    
-                    // Black flash
-                    document.body.style.backgroundColor = 'black';
-                    document.body.style.filter = 'brightness(0.1)';
                 } else {
-                    // Gap (normal background)
-                    document.body.style.backgroundColor = originalBg;
-                    document.body.style.filter = originalFilter;
+                    // Maximum black between signals
+                    document.body.style.backgroundColor = '#000000';
+                    document.body.style.filter = 'brightness(0)';
+                    console.log(`Black gap for ${step.duration}ms`);
                     await this.delay(step.duration);
                 }
             }
             
-            // Restore original styles
-            document.body.style.backgroundColor = originalBg;
-            document.body.style.filter = originalFilter;
-            document.body.style.transition = '';
-            this.elements.transmitMode.style.opacity = '';
+            console.log('Flash pattern completed, restoring normal view');
             
         } catch (error) {
             console.error('Error executing screen flash pattern:', error);
             throw error;
+        } finally {
+            // Always restore normal state
+            this.restoreNormalDisplay();
         }
+    }
+    
+    restoreNormalDisplay() {
+        // Remove fullscreen flash mode
+        document.body.classList.remove('fullscreen-flash');
+        
+        // Reset all body styles
+        document.body.style.backgroundColor = '';
+        document.body.style.filter = '';
+        
+        // Restore content visibility
+        this.elements.transmitMode.style.opacity = '';
+        if (this.elements.receiveMode) {
+            this.elements.receiveMode.style.opacity = '';
+        }
+        
+        console.log('Normal display restored');
     }
     
     showDiagnosticInfo() {
@@ -382,11 +397,8 @@ class MorseApp {
         this.elements.transmitButton.textContent = 'Start Transmission';
         this.elements.transmissionStatus.classList.add('hidden');
         
-        // Reset screen flash styles
-        document.body.style.backgroundColor = '';
-        document.body.style.filter = '';
-        document.body.style.transition = '';
-        this.elements.transmitMode.style.opacity = '';
+        // Reset screen flash completely
+        this.restoreNormalDisplay();
         
         if (this.track) {
             this.setFlashlight(false);
