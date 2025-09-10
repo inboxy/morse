@@ -41,10 +41,56 @@ class MorseCode {
             .split(' / ')
             .map(word => 
                 word.split(' ')
-                    .map(symbol => this.reverseMap[symbol] || '')
+                    .map(symbol => {
+                        if (!symbol) return '';
+                        
+                        // Use fuzzy matching for better accuracy
+                        const match = this.findBestMatch(symbol, 0.6);
+                        return match.char || '?';
+                    })
                     .join('')
             )
             .join(' ');
+    }
+    
+    // Improved decoding with confidence tracking
+    morseToTextWithConfidence(morse) {
+        const words = morse.split(' / ');
+        const results = [];
+        
+        for (const word of words) {
+            const letters = word.split(' ');
+            const wordResult = {
+                text: '',
+                confidence: 0,
+                letterDetails: []
+            };
+            
+            let totalConfidence = 0;
+            for (const symbol of letters) {
+                if (!symbol) continue;
+                
+                const match = this.findBestMatch(symbol, 0.5);
+                wordResult.text += match.char || '?';
+                wordResult.letterDetails.push({
+                    pattern: symbol,
+                    char: match.char || '?',
+                    confidence: match.confidence,
+                    alternatives: match.matches
+                });
+                totalConfidence += match.confidence;
+            }
+            
+            wordResult.confidence = letters.length > 0 ? totalConfidence / letters.length : 0;
+            results.push(wordResult);
+        }
+        
+        return {
+            text: results.map(r => r.text).join(' '),
+            words: results,
+            overallConfidence: results.length > 0 ? 
+                results.reduce((sum, r) => sum + r.confidence, 0) / results.length : 0
+        };
     }
     
     getTimingPattern(morseCode) {
@@ -105,6 +151,81 @@ class MorseCode {
         const validChars = Object.keys(this.morseMap).join('') + ' ';
         return text.toUpperCase().split('').every(char => validChars.includes(char));
     }
+    
+    // Calculate similarity between two morse patterns
+    calculatePatternSimilarity(pattern1, pattern2) {
+        if (pattern1 === pattern2) return 1.0;
+        
+        const len1 = pattern1.length;
+        const len2 = pattern2.length;
+        const maxLen = Math.max(len1, len2);
+        
+        if (maxLen === 0) return 1.0;
+        
+        // Levenshtein distance for morse patterns
+        const matrix = Array(len1 + 1).fill().map(() => Array(len2 + 1).fill(0));
+        
+        for (let i = 0; i <= len1; i++) matrix[i][0] = i;
+        for (let j = 0; j <= len2; j++) matrix[0][j] = j;
+        
+        for (let i = 1; i <= len1; i++) {
+            for (let j = 1; j <= len2; j++) {
+                const cost = pattern1[i - 1] === pattern2[j - 1] ? 0 : 1;
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j] + 1,     // deletion
+                    matrix[i][j - 1] + 1,     // insertion
+                    matrix[i - 1][j - 1] + cost // substitution
+                );
+            }
+        }
+        
+        const distance = matrix[len1][len2];
+        return 1.0 - (distance / maxLen);
+    }
+    
+    // Find best matching character with confidence score
+    findBestMatch(morsePattern, minConfidence = 0.7) {
+        if (!morsePattern || morsePattern.length === 0) {
+            return { char: '', confidence: 0, matches: [] };
+        }
+        
+        // Direct match first
+        if (this.reverseMap[morsePattern]) {
+            return {
+                char: this.reverseMap[morsePattern],
+                confidence: 1.0,
+                matches: [{
+                    char: this.reverseMap[morsePattern],
+                    pattern: morsePattern,
+                    confidence: 1.0,
+                    type: 'exact'
+                }]
+            };
+        }
+        
+        // Fuzzy matching
+        const candidates = [];
+        for (const [pattern, char] of Object.entries(this.reverseMap)) {
+            const similarity = this.calculatePatternSimilarity(morsePattern, pattern);
+            if (similarity >= minConfidence) {
+                candidates.push({
+                    char,
+                    pattern,
+                    confidence: similarity,
+                    type: 'fuzzy'
+                });
+            }
+        }
+        
+        // Sort by confidence
+        candidates.sort((a, b) => b.confidence - a.confidence);
+        
+        return {
+            char: candidates.length > 0 ? candidates[0].char : '',
+            confidence: candidates.length > 0 ? candidates[0].confidence : 0,
+            matches: candidates.slice(0, 3) // Top 3 matches
+        };
+    }
 }
 
 class LightDetector {
@@ -126,6 +247,16 @@ class LightDetector {
         // Signal filtering
         this.signalHistory = [];
         this.maxSignalHistory = 5;
+        
+        // Timing analysis and confidence scoring
+        this.dotDurations = [];
+        this.dashDurations = [];
+        this.maxTimingSamples = 20;
+        this.timingConfidence = 0;
+        
+        // Adaptive timing tolerance
+        this.timingTolerance = 0.3; // 30% tolerance initially
+        this.adaptiveDotThreshold = null;
         
         // Dynamic timing based on Morse code speed
         this.morseCode = morseCodeInstance;
@@ -300,11 +431,17 @@ class LightDetector {
                 console.log('  Expected dash duration:', expectedDash, 'ms');
                 console.log('  Dot threshold (cutoff):', this.dotThreshold, 'ms');
                 
-                const isActualDot = timeSinceLastTransition < this.dotThreshold;
+                // Adaptive timing analysis
+                const confidence = this.analyzeSignalConfidence(timeSinceLastTransition);
+                const isActualDot = this.classifySignal(timeSinceLastTransition);
                 const symbol = isActualDot ? '.' : '-';
                 
+                // Learn from this signal to improve future detection
+                this.learnFromSignal(timeSinceLastTransition, isActualDot);
+                
                 console.log('  DECISION:', isActualDot ? 'DOT (.)' : 'DASH (-)');
-                console.log('  Reason: duration', timeSinceLastTransition, isActualDot ? '<' : '≥', this.dotThreshold);
+                console.log('  Confidence:', (confidence * 100).toFixed(1) + '%');
+                console.log('  Reason: duration', timeSinceLastTransition, isActualDot ? '<' : '≥', this.getEffectiveThreshold());
                 
                 this.currentSequence += symbol;
                 console.log('  ✓ Current sequence:', this.currentSequence);
@@ -314,18 +451,27 @@ class LightDetector {
                 const letters = lastWord.split(' ');
                 const currentLetter = letters[letters.length - 1];
                 if (currentLetter && this.morseCode) {
-                    const decoded = this.morseCode.reverseMap[currentLetter];
-                    if (decoded) {
-                        console.log('  ✅ Letter decoded:', currentLetter, '→', decoded);
+                    const matchResult = this.morseCode.findBestMatch(currentLetter);
+                    if (matchResult.char && matchResult.confidence >= 0.7) {
+                        const matchType = matchResult.confidence === 1.0 ? '✅ EXACT' : '🔍 FUZZY';
+                        console.log(`  ${matchType} match:`, currentLetter, '→', matchResult.char, 
+                                   `(${(matchResult.confidence * 100).toFixed(1)}%)`);
+                        
+                        if (matchResult.matches.length > 1) {
+                            console.log('     Alternatives:', 
+                                matchResult.matches.slice(1).map(m => 
+                                    `${m.pattern}→${m.char} (${(m.confidence * 100).toFixed(1)}%)`
+                                ).join(', ')
+                            );
+                        }
                     } else {
-                        console.log('  ❌ Unknown pattern:', currentLetter);
-                        // Show closest matches
-                        const allPatterns = Object.entries(this.morseCode.reverseMap);
-                        const similar = allPatterns.filter(([pattern]) => 
-                            pattern.length === currentLetter.length
-                        );
-                        if (similar.length > 0) {
-                            console.log('     Similar length patterns:', similar.map(([p, c]) => `${p}→${c}`).join(', '));
+                        console.log('  ❌ No confident match for:', currentLetter);
+                        if (matchResult.matches.length > 0) {
+                            console.log('     Low confidence matches:', 
+                                matchResult.matches.map(m => 
+                                    `${m.pattern}→${m.char} (${(m.confidence * 100).toFixed(1)}%)`
+                                ).join(', ')
+                            );
                         }
                     }
                 }
@@ -340,8 +486,70 @@ class LightDetector {
             threshold: this.brightnessThreshold,
             isSignalDetected: isSignalOn,
             sequence: this.currentSequence.trim(),
-            debug: debugData
+            debug: debugData,
+            timingConfidence: this.timingConfidence
         };
+    }
+    
+    classifySignal(duration) {
+        const threshold = this.getEffectiveThreshold();
+        return duration < threshold;
+    }
+    
+    getEffectiveThreshold() {
+        return this.adaptiveDotThreshold || this.dotThreshold;
+    }
+    
+    analyzeSignalConfidence(duration) {
+        const expectedDot = this.morseCode ? this.morseCode.dotDuration : 120;
+        const expectedDash = this.morseCode ? this.morseCode.dashDuration : 360;
+        
+        // Calculate how close this duration is to expected values
+        const dotDistance = Math.abs(duration - expectedDot) / expectedDot;
+        const dashDistance = Math.abs(duration - expectedDash) / expectedDash;
+        
+        const minDistance = Math.min(dotDistance, dashDistance);
+        return Math.max(0, 1 - minDistance);
+    }
+    
+    learnFromSignal(duration, isDot) {
+        // Add to appropriate timing history
+        if (isDot) {
+            this.dotDurations.push(duration);
+            if (this.dotDurations.length > this.maxTimingSamples) {
+                this.dotDurations.shift();
+            }
+        } else {
+            this.dashDurations.push(duration);
+            if (this.dashDurations.length > this.maxTimingSamples) {
+                this.dashDurations.shift();
+            }
+        }
+        
+        // Update adaptive threshold if we have enough samples
+        if (this.dotDurations.length >= 5 && this.dashDurations.length >= 5) {
+            this.updateAdaptiveThreshold();
+        }
+    }
+    
+    updateAdaptiveThreshold() {
+        const avgDot = this.dotDurations.reduce((a, b) => a + b, 0) / this.dotDurations.length;
+        const avgDash = this.dashDurations.reduce((a, b) => a + b, 0) / this.dashDurations.length;
+        
+        // Set threshold at midpoint between average dot and dash durations
+        this.adaptiveDotThreshold = (avgDot + avgDash) / 2;
+        
+        // Calculate timing confidence based on separation
+        const separation = Math.abs(avgDash - avgDot);
+        const expectedSeparation = this.morseCode ? (this.morseCode.dashDuration - this.morseCode.dotDuration) : 240;
+        this.timingConfidence = Math.min(1.0, separation / expectedSeparation);
+        
+        console.log('📊 Adaptive timing update:', {
+            avgDot: avgDot.toFixed(1) + 'ms',
+            avgDash: avgDash.toFixed(1) + 'ms',
+            newThreshold: this.adaptiveDotThreshold.toFixed(1) + 'ms',
+            confidence: (this.timingConfidence * 100).toFixed(1) + '%'
+        });
     }
     
     reset() {
@@ -358,6 +566,12 @@ class LightDetector {
         this.calibrationSamples = 0;
         this.isCalibrated = false;
         this.brightnessThreshold = 0.5; // Reset to default
+        
+        // Reset adaptive timing data
+        this.dotDurations = [];
+        this.dashDurations = [];
+        this.timingConfidence = 0;
+        this.adaptiveDotThreshold = null;
         
         // Log current timing settings
         if (this.morseCode) {
