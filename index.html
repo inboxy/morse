@@ -14,17 +14,19 @@
             <h1>Morse Code Communicator</h1>
         </header>
 
-        <div class="mode-toggle">
-            <button id="transmitBtn" class="mode-btn active">TRANSMIT</button>
-            <button id="receiveBtn" class="mode-btn">RECEIVE</button>
+        <div class="mode-toggle" role="tablist" aria-label="Mode selection">
+            <button id="transmitBtn" class="mode-btn active" role="tab" aria-selected="true" aria-controls="transmitMode">TRANSMIT</button>
+            <button id="receiveBtn" class="mode-btn" role="tab" aria-selected="false" aria-controls="receiveMode">RECEIVE</button>
         </div>
 
-        <div id="transmitMode" class="mode-content">
+        <div id="transmitMode" class="mode-content" role="tabpanel" aria-labelledby="transmitBtn">
             <div class="input-section">
                 <textarea 
                     id="messageInput" 
                     placeholder="Enter your message (max 100 characters)"
                     maxlength="100"
+                    aria-label="Message to transmit"
+                    aria-describedby="charCount"
                 ></textarea>
                 <div class="char-counter">
                     <span id="charCount">0</span>/100
@@ -36,7 +38,7 @@
                 <div id="morseOutput"></div>
             </div>
 
-            <button id="startTransmitBtn" class="action-btn">Start Transmission</button>
+            <button id="startTransmitBtn" class="action-btn" aria-describedby="transmissionStatus">Start Transmission</button>
             
             <div id="transmissionStatus" class="status hidden">
                 <div class="status-indicator"></div>
@@ -44,14 +46,14 @@
             </div>
         </div>
 
-        <div id="receiveMode" class="mode-content hidden">
+        <div id="receiveMode" class="mode-content hidden" role="tabpanel" aria-labelledby="receiveBtn">
             <div class="camera-section">
-                <video id="cameraVideo" autoplay muted></video>
+                <video id="cameraVideo" autoplay muted aria-label="Camera feed for light detection"></video>
                 <canvas id="detectionCanvas" class="hidden"></canvas>
             </div>
             
-            <button id="startReceiveBtn" class="action-btn">Start Receiving</button>
-            <button id="stopReceiveBtn" class="action-btn hidden">Stop Receiving</button>
+            <button id="startReceiveBtn" class="action-btn" aria-describedby="receiveStatus">Start Receiving</button>
+            <button id="stopReceiveBtn" class="action-btn hidden" aria-describedby="receiveStatus">Stop Receiving</button>
             
             <div id="receiveStatus" class="status hidden">
                 <div class="status-indicator"></div>
@@ -60,10 +62,10 @@
 
             <div class="received-section">
                 <label>Received Morse:</label>
-                <div id="receivedMorse"></div>
+                <div id="receivedMorse" aria-live="polite"></div>
                 
                 <label>Decoded Message:</label>
-                <div id="decodedMessage"></div>
+                <div id="decodedMessage" aria-live="polite"></div>
             </div>
         </div>
     </div>

@@ -54,10 +54,10 @@ class MorseApp {
     async registerServiceWorker() {
         if ('serviceWorker' in navigator) {
             try {
-                await navigator.serviceWorker.register('./sw.js');
-                console.log('Service Worker registered');
+                const registration = await navigator.serviceWorker.register('./sw.js');
+                console.log('Service Worker registered successfully', registration);
             } catch (error) {
-                console.log('Service Worker registration failed:', error);
+                console.error('Service Worker registration failed:', error);
             }
         }
     }
@@ -67,6 +67,9 @@ class MorseApp {
         
         this.elements.transmitBtn.classList.toggle('active', mode === 'transmit');
         this.elements.receiveBtn.classList.toggle('active', mode === 'receive');
+        
+        this.elements.transmitBtn.setAttribute('aria-selected', mode === 'transmit');
+        this.elements.receiveBtn.setAttribute('aria-selected', mode === 'receive');
         
         this.elements.transmitMode.classList.toggle('hidden', mode !== 'transmit');
         this.elements.receiveMode.classList.toggle('hidden', mode !== 'receive');
@@ -160,16 +163,21 @@ class MorseApp {
     }
     
     async executeFlashPattern(pattern) {
-        for (const step of pattern) {
-            if (!this.isTransmitting) break;
-            
-            if (step.type === 'on') {
-                await this.setFlashlight(true);
-                await this.delay(step.duration);
-                await this.setFlashlight(false);
-            } else {
-                await this.delay(step.duration);
+        try {
+            for (const step of pattern) {
+                if (!this.isTransmitting) break;
+                
+                if (step.type === 'on') {
+                    await this.setFlashlight(true);
+                    await this.delay(step.duration);
+                    await this.setFlashlight(false);
+                } else {
+                    await this.delay(step.duration);
+                }
             }
+        } catch (error) {
+            console.error('Error executing flash pattern:', error);
+            throw error;
         }
     }
     
@@ -208,6 +216,10 @@ class MorseApp {
             this.canvas = this.elements.detectionCanvas;
             this.ctx = this.canvas.getContext('2d');
             
+            if (!this.ctx) {
+                throw new Error('Could not get canvas context');
+            }
+            
             this.lightDetector.reset();
             this.elements.receivedMorse.textContent = '';
             this.elements.decodedMessage.textContent = '';
@@ -215,13 +227,20 @@ class MorseApp {
             this.detectLight();
             
         } catch (error) {
+            console.error('Camera access error:', error);
             alert('Could not access camera: ' + error.message);
             this.stopReceiving();
         }
     }
     
     detectLight() {
-        if (!this.isReceiving) return;
+        if (!this.isReceiving) {
+            if (this.animationFrame) {
+                cancelAnimationFrame(this.animationFrame);
+                this.animationFrame = null;
+            }
+            return;
+        }
         
         const video = this.elements.cameraVideo;
         
@@ -246,7 +265,9 @@ class MorseApp {
             }
         }
         
-        this.animationFrame = requestAnimationFrame(() => this.detectLight());
+        if (this.isReceiving) {
+            this.animationFrame = requestAnimationFrame(() => this.detectLight());
+        }
     }
     
     stopReceiving() {

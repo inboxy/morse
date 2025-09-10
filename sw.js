@@ -1,11 +1,10 @@
 const CACHE_NAME = 'morse-communicator-v1';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/app.js',
-  '/morse.js',
-  '/manifest.json'
+  './index.html',
+  './styles.css',
+  './app.js',
+  './morse.js',
+  './manifest.json'
 ];
 
 self.addEventListener('install', function(event) {
