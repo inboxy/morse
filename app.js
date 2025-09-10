@@ -793,9 +793,36 @@ function initializeApp() {
         return 'Common characters test logged';
     };
     
+    window.analyzeWord = (word) => {
+        console.log(`=== ANALYZING WORD: "${word}" ===`);
+        const morse = app.morseCode.textToMorse(word);
+        console.log(`Full Morse: ${morse}`);
+        
+        word.split('').forEach((char, i) => {
+            const charMorse = app.morseCode.textToMorse(char);
+            console.log(`${i + 1}. ${char} = ${charMorse}`);
+            
+            // Show timing for each dot/dash
+            charMorse.split('').forEach((symbol, j) => {
+                if (symbol === '.') {
+                    console.log(`   Dot ${j + 1}: ${app.morseCode.dotDuration}ms`);
+                } else if (symbol === '-') {
+                    console.log(`   Dash ${j + 1}: ${app.morseCode.dashDuration}ms`);
+                }
+            });
+        });
+        
+        return `Analysis complete for "${word}"`;
+    };
+    
+    // Quick test for HELLO
+    window.testHello = () => analyzeWord('HELLO');
+    
     console.log('Character testing functions:');
     console.log('- testCharacter(char) - show timing for specific character');
     console.log('- testCommonChars() - show common characters');
+    console.log('- analyzeWord(word) - detailed analysis of word timing');
+    console.log('- testHello() - quick test for HELLO word');
     
     return app;
 }

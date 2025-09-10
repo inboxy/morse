@@ -137,24 +137,31 @@ class LightDetector {
             const unit = this.morseCode.unit;
             // Timing thresholds for signal detection
             this.minSignalDuration = Math.max(unit * 0.3, 30); // 30% of unit, min 30ms
-            this.dotThreshold = unit * 2; // 2 units - between dot and dash
-            this.letterGapThreshold = unit * 2; // 2 units - between symbol and letter gap
-            this.wordGapThreshold = unit * 5; // 5 units - between letter and word gap
+            
+            // Critical fix: dot threshold should be between dot (1 unit) and dash (3 units)
+            // Set it at 2 units to properly distinguish
+            this.dotThreshold = unit * 2; // 2 units - between dot (1u) and dash (3u)
+            
+            // Gap detection thresholds
+            this.letterGapThreshold = unit * 2.5; // 2.5 units - between symbol gap (1u) and letter gap (3u)
+            this.wordGapThreshold = unit * 5; // 5 units - between letter gap (3u) and word gap (7u)
             this.maxGapDuration = unit * 10; // 10 units max before reset
             
             console.log(`Light detector timing updated for ${this.morseCode.getSpeed()} WPM:`, {
-                unit,
-                minSignal: this.minSignalDuration,
-                dotThreshold: this.dotThreshold,
-                letterGap: this.letterGapThreshold,
-                wordGap: this.wordGapThreshold
+                unit: unit + 'ms',
+                dotDuration: this.morseCode.dotDuration + 'ms',
+                dashDuration: this.morseCode.dashDuration + 'ms',
+                dotThreshold: this.dotThreshold + 'ms',
+                minSignal: this.minSignalDuration + 'ms',
+                letterGap: this.letterGapThreshold + 'ms',
+                wordGap: this.wordGapThreshold + 'ms'
             });
         } else {
             // Fallback for legacy timing
             this.minSignalDuration = 50;
-            this.dotThreshold = 350;
-            this.letterGapThreshold = 300;
-            this.wordGapThreshold = 2000;
+            this.dotThreshold = 300; // Increased from 350 to be more forgiving
+            this.letterGapThreshold = 400;
+            this.wordGapThreshold = 800;
             this.maxGapDuration = 2000;
         }
     }
@@ -284,18 +291,23 @@ class LightDetector {
                 
             } else if (this.lastState === true && isSignalOn === false) {
                 // Signal ended - determine dot or dash based on signal duration
-                console.log('Signal OFF - signal duration:', timeSinceLastTransition, 'ms');
-                console.log('Dot threshold:', this.dotThreshold, 'ms');
+                const expectedDot = this.morseCode ? this.morseCode.dotDuration : 120;
+                const expectedDash = this.morseCode ? this.morseCode.dashDuration : 360;
                 
-                if (timeSinceLastTransition < this.dotThreshold) {
-                    console.log('Adding DOT (.) - duration was short');
-                    this.currentSequence += '.';
-                } else {
-                    console.log('Adding DASH (-) - duration was long');
-                    this.currentSequence += '-';
-                }
+                console.log('🔴 Signal OFF - analyzing duration:');
+                console.log('  Measured duration:', timeSinceLastTransition, 'ms');
+                console.log('  Expected dot duration:', expectedDot, 'ms');
+                console.log('  Expected dash duration:', expectedDash, 'ms');
+                console.log('  Dot threshold (cutoff):', this.dotThreshold, 'ms');
                 
-                console.log('Current sequence:', this.currentSequence);
+                const isActualDot = timeSinceLastTransition < this.dotThreshold;
+                const symbol = isActualDot ? '.' : '-';
+                
+                console.log('  DECISION:', isActualDot ? 'DOT (.)' : 'DASH (-)');
+                console.log('  Reason: duration', timeSinceLastTransition, isActualDot ? '<' : '≥', this.dotThreshold);
+                
+                this.currentSequence += symbol;
+                console.log('  ✓ Current sequence:', this.currentSequence);
                 
                 // Try to decode current letter if we have symbols
                 const lastWord = this.currentSequence.split(' / ').pop();
@@ -304,9 +316,17 @@ class LightDetector {
                 if (currentLetter && this.morseCode) {
                     const decoded = this.morseCode.reverseMap[currentLetter];
                     if (decoded) {
-                        console.log('Current letter decoded:', currentLetter, '→', decoded);
+                        console.log('  ✅ Letter decoded:', currentLetter, '→', decoded);
                     } else {
-                        console.log('Unknown Morse pattern:', currentLetter);
+                        console.log('  ❌ Unknown pattern:', currentLetter);
+                        // Show closest matches
+                        const allPatterns = Object.entries(this.morseCode.reverseMap);
+                        const similar = allPatterns.filter(([pattern]) => 
+                            pattern.length === currentLetter.length
+                        );
+                        if (similar.length > 0) {
+                            console.log('     Similar length patterns:', similar.map(([p, c]) => `${p}→${c}`).join(', '));
+                        }
                     }
                 }
             }
